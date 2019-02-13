@@ -68,8 +68,8 @@ find_clusters <- function(connections, d_thresh = 0.8){
   }
   
   # Construct graph from the given edges
-  g <- igraph::graph_from_edgelist(as.matrix(conn[1:2]), directed = FALSE)
-  
+  g <- igraph::graph_from_edgelist(as.matrix(connections[1:2]), directed = FALSE)
+  plot(g)
   # Initialize list of clusters
   clusters <- list()
   k <- 1
@@ -82,7 +82,7 @@ find_clusters <- function(connections, d_thresh = 0.8){
     # Only keep the densely connected part of each component (subgraph)
     for(subg in comp){
       
-      n_nodes <- length(V(subg))
+      n_nodes <- length(igraph::V(subg))
       d <- igraph::degree(subg)
       # The limit of the degree a node needs to be kept
       d_lim <- round(d_thresh * (n_nodes-1))
@@ -93,7 +93,7 @@ find_clusters <- function(connections, d_thresh = 0.8){
         # a degree above the limit
         while(any(d < d_lim)){
           idx <- which(d == min(d))[1]
-          subg <- igraph::delete.vertices(subg, v = V(subg)[idx])
+          subg <- igraph::delete.vertices(subg, v = igraph::V(subg)[idx])
           d <- igraph::degree(subg)
           n_nodes <- n_nodes - 1
           d_lim <- round(d_thresh * (n_nodes-1))
@@ -101,7 +101,7 @@ find_clusters <- function(connections, d_thresh = 0.8){
       }
       
       # Record the final cluster and remove the nodes from the main graph
-      clusters[[k]] <- list(features = names(V(subg)),
+      clusters[[k]] <- list(features = names(igraph::V(subg)),
                             graph = subg)
       k <- k + 1
       g <- igraph::delete.vertices(g, v = names(igraph::V(subg)))
@@ -113,8 +113,37 @@ find_clusters <- function(connections, d_thresh = 0.8){
 
 
 pull_peaks <- function(clusters, data, peaks,
-                       name_col, mz_col, rt_col){
+                       name_col){
   
+  # Median peak area
+  peaks$MPA <- sapply(data[peaks[, name_col]], median, na.rm = TRUE)
+  
+  cpeaks <- data.frame()
+  sample_cols <- setdiff(colnames(data), peaks[, name_col])
+  cdata <- data[sample_cols]
+  
+  for (cluster in clusters) {
+    peaks_tmp <- peaks[peaks[, name_col] %in% cluster$features, ]
+    
+    max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
+    cluster_row <- peaks_tmp[max_mpa_idx, ]
+    cluster_row$Peaks <- paste(sort(cluster$features), collapse = ";")
+    
+    if (length(cluster$features) == 1) {
+      cluster_row$Cluster_ID <- cluster_row[, name_col]
+    } else {
+      cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
+    }
+    
+    cpeaks <- rbind(cpeaks, cluster_row)
+    
+    cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
+    colnames(cdata_col) <- cluster_row$Cluster_ID
+    cdata <- cbind(cdata, cdata_col)
+  }
+  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "Peaks", name_col, dplyr::everything())
+  
+  list(cpeaks = cpeaks, cdata = cdata)
 }
 
 

@@ -2,8 +2,8 @@ library(igraph)
 library(openxlsx)
 
 
-setwd("//research/antom/Projects/PeakCluster")
-source('R_PeakCluster.R')
+setwd("//research/antom/Projects/PeakCluster/peak_clustR")
+source('functions.R')
 
 n <- 100
 
@@ -27,15 +27,17 @@ cor(X)
 colnames(X) <- paste0("COMPOUND_", 1:ncol(X))
 
 P <- data.frame(Name = colnames(X), mzmin = 100, mz = 100, mzmax = 100,
-                rtmin = 1, rt = 1, rtmax = 1)
+                rtmin = 1, rt = 1, rtmax = 1, stringsAsFactors = FALSE)
 P
 
 conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 2, name_col = "Name", mz_col = "mz", rt_col = "rt")
 
 
-conn
+clusters <- find_clusters(conn)
 
-
+pulled <- pull_peaks(clusters, data= X, peaks = P, name_col = "Name")
+cdata <- pulled$cdata
+cpeaks <- pulled$cpeaks
 
 
 

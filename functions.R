@@ -60,15 +60,16 @@ find_connections <- function(data, peaks, corr_thresh = 0.9, rt_window = 1/60,
 #
 # Returns:
 # a list of clusters, each a list of:
-#   - features: character vector of the names of the features included in the cluster
+#   - peaks: character vector of the names of the peaks included in the cluster
 #   - graph: an igraph object of the cluster
-find_clusters <- function(connections, d_thresh = 0.8){
+find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
   if(!requireNamespace("igraph", quietly = TRUE)){
     stop("The igraph package is required for this function")
   }
   
   # Construct graph from the given edges
   g <- igraph::graph_from_edgelist(as.matrix(connections[1:2]), directed = FALSE)
+  
   plot(g)
   # Initialize list of clusters
   clusters <- list()
@@ -101,7 +102,7 @@ find_clusters <- function(connections, d_thresh = 0.8){
       }
       
       # Record the final cluster and remove the nodes from the main graph
-      clusters[[k]] <- list(features = names(igraph::V(subg)),
+      clusters[[k]] <- list(peaks = names(igraph::V(subg)),
                             graph = subg)
       k <- k + 1
       g <- igraph::delete.vertices(g, v = names(igraph::V(subg)))
@@ -121,29 +122,36 @@ pull_peaks <- function(clusters, data, peaks,
   cpeaks <- data.frame()
   sample_cols <- setdiff(colnames(data), peaks[, name_col])
   cdata <- data[sample_cols]
+  handled_peaks <- c()
   
   for (cluster in clusters) {
-    peaks_tmp <- peaks[peaks[, name_col] %in% cluster$features, ]
+    peaks_tmp <- peaks[peaks[, name_col] %in% cluster$peaks, ]
     
     max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
     cluster_row <- peaks_tmp[max_mpa_idx, ]
-    cluster_row$Peaks <- paste(sort(cluster$features), collapse = ";")
+    cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
     
-    if (length(cluster$features) == 1) {
-      cluster_row$Cluster_ID <- cluster_row[, name_col]
-    } else {
-      cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
-    }
+    cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
     
     cpeaks <- rbind(cpeaks, cluster_row)
     
     cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
     colnames(cdata_col) <- cluster_row$Cluster_ID
     cdata <- cbind(cdata, cdata_col)
+    
+    handled_peaks <- c(handled_peaks, cluster$peaks)
   }
+  
+  missed_peaks <- peaks[!peaks[, name_col] %in% handled_peaks, ]
+  missed_peaks$Cluster_ID <- missed_peaks[, name_col]
+  missed_peaks$Peaks <- missed_peaks[, name_col]
+  
+  cpeaks <- rbind(missed_peaks, cpeaks)
   cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "Peaks", name_col, dplyr::everything())
   
-  list(cpeaks = cpeaks, cdata = cdata)
+  cdata <- cbind(cdata, data[missed_peaks[, name_col]])
+  
+  list(cdata = cdata, cpeaks = cpeaks)
 }
 
 
@@ -153,7 +161,7 @@ pull_peaks <- function(clusters, data, peaks,
 # dfs:        a list of dataframes, one per sheet
 # filename:   character, the name of the file
 # sheetnames: charcater vector, names of the sheets
-multisheet_xlsx <- function(dfs, filename, sheetnames){
+multisheet_xlsx <- function(dfs, filename, sheetnames = c("Data", "Peaks")){
   
   if (length(dfs) != length(sheetnames)) {
     stop("The number of dataframes and the number of sheet names does not match!")

@@ -145,7 +145,8 @@ save_clusters <- function(data, peaks, clusters){
 }
 
 
-
+# A helper function for plotting, scales the values in X
+# between new min and max
 rescale <- function(x, new_min, new_max){
   (new_max - new_min) * (x - min(x)) / (max(x) - min(x)) + new_min
 }

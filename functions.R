@@ -1,12 +1,4 @@
 
-
-
-
-
-
-
-
-
 # Find out which peaks are correlated within a specified retention time window
 
 # Parameters:
@@ -28,7 +20,10 @@
 find_connections <- function(data, peaks, corr_thresh = 0.9, rt_window = 1/60,
                          name_col, mz_col, rt_col) {
   
-  D <- data[peaks[, name_col]]
+  D <- data[peaks[,name_col]]
+  if (ncol(D) < 2) {
+    stop("Need at least 2 signals to do any clustering!")
+  }
   C <- cor(D)
   n <- nrow(peaks)
   connections <- data.frame()
@@ -37,9 +32,9 @@ find_connections <- function(data, peaks, corr_thresh = 0.9, rt_window = 1/60,
       print(i)
     }
     for (j in (i+1):n){
-      rt_diff <- abs(peaks[i, rt_col] - peaks[j, rt_col])
-      mz_diff <- abs(peaks[i, mz_col] - peaks[j, mz_col])
-      if (rt_diff < rt_window & C[i,j] > corr_thresh){
+      rt_diff <- peaks[j, rt_col] - peaks[i, rt_col]
+      if (abs(rt_diff) < rt_window & C[i,j] > corr_thresh){
+        mz_diff <- peaks[j, mz_col] - peaks[i, mz_col]
         connections = rbind(connections, data.frame(x = peaks[i, name_col], y = peaks[j, name_col],
                                                     cor = C[i,j], rt_diff = rt_diff, mz_diff = mz_diff))
       }

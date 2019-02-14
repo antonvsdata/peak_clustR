@@ -112,7 +112,20 @@ find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
   clusters
 }
 
-
+# Extract information of the peaks of all clusters
+# The LC-MS data of the peak with largest median peak area is retained,
+# all the peaks in every cluster are recorded
+#
+# Parameters:
+# - clusters: list of cluster information, as returned by find_clusters
+# - data: data frame of the original LC-MS data
+# - peaks: data frame holding the peak information
+# - name_col: a string, name of the column in peaks that contains signal names
+#
+# Returns:
+# List of two items:
+#   - cdata: a new data frame with the combined LC-MS data
+#   - cpeaks: data frame, peak information per cluster
 pull_peaks <- function(clusters, data, peaks,
                        name_col){
   
@@ -124,17 +137,20 @@ pull_peaks <- function(clusters, data, peaks,
   cdata <- data[sample_cols]
   handled_peaks <- c()
   
+  # Retain the strongest signal (MPA) from each cluster 
   for (cluster in clusters) {
     peaks_tmp <- peaks[peaks[, name_col] %in% cluster$peaks, ]
     
+    # Find the peak with maximal MPA
     max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
     cluster_row <- peaks_tmp[max_mpa_idx, ]
+    # Record all the peaks in the cluster
     cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
-    
+    # Create cluster ID
     cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
-    
     cpeaks <- rbind(cpeaks, cluster_row)
     
+    # Take the LC-MS data of the largest peak
     cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
     colnames(cdata_col) <- cluster_row$Cluster_ID
     cdata <- cbind(cdata, cdata_col)
@@ -142,14 +158,16 @@ pull_peaks <- function(clusters, data, peaks,
     handled_peaks <- c(handled_peaks, cluster$peaks)
   }
   
+  # All the peaks that were not in the clusters are retained unchanged
   missed_peaks <- peaks[!peaks[, name_col] %in% handled_peaks, ]
   missed_peaks$Cluster_ID <- missed_peaks[, name_col]
   missed_peaks$Peaks <- missed_peaks[, name_col]
   
   cpeaks <- rbind(missed_peaks, cpeaks)
-  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "Peaks", name_col, dplyr::everything())
-  
   cdata <- cbind(cdata, data[missed_peaks[, name_col]])
+  
+  # Reorder columns
+  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "Peaks", name_col, dplyr::everything())
   
   list(cdata = cdata, cpeaks = cpeaks)
 }
@@ -176,39 +194,3 @@ multisheet_xlsx <- function(dfs, filename, sheetnames = c("Data", "Peaks")){
   
   openxlsx::saveWorkbook(wb, filename, overwrite = TRUE)
 }
-
-save_clusters <- function(data, peaks, clusters){
-  "hi"
-}
-
-
-# A helper function for plotting, scales the values in X
-# between new min and max
-rescale <- function(x, new_min, new_max){
-  (new_max - new_min) * (x - min(x)) / (max(x) - min(x)) + new_min
-}
-
-
-# UNFINISHED!!
-plot_cluster <- function(peaks, cluster, name_col, mz_col, rt_col){
-  
-  # Ensure a correct order of the rows
-  g <- cluster$graph
-  vertices <- data.frame(Name = igraph::V(g)$name, stringsAsFactors = FALSE)
-  colnames(vertices) <- name_col
-  P <- dplyr::left_join(vertices, peaks)
-  
-  # Scaling of MPA to correct size
-  # Square root to scale area, not radius
-  size <- sqrt(rescale(P$MPA, new_min = 15^2, new_max = 40^2))
-  
-  V(g)$label <- P$mz
-  V(g)$size <- size
-  V(g)$color <- c(1,2,3)
-  
-  g$palette <- brewer.pal(n = max(3, length(unique(degree(g)))), name = "Blues")
-  pdf("lol.pdf", width = 6, height = 6)
-  plot(g, vertex.label.dist = 0.105*V(g)$size, vertex.label.degree = -pi/2)
-  dev.off()
-}
-

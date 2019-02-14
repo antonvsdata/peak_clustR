@@ -64,8 +64,8 @@ find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
   
   # Construct graph from the given edges
   g <- igraph::graph_from_edgelist(as.matrix(connections[1:2]), directed = FALSE)
+  g <- igraph::set.edge.attribute(graph = g, name = "weight", value = connections$cor)
   
-  plot(g)
   # Initialize list of clusters
   clusters <- list()
   k <- 1

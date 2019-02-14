@@ -141,6 +141,7 @@ pull_peaks <- function(clusters, data, peaks,
     cluster_row <- peaks_tmp[max_mpa_idx, ]
     # Record all the peaks in the cluster
     cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
+    cluster_row$n_peaks <- length(cluster$peaks)
     # Create cluster ID
     cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
     cpeaks <- rbind(cpeaks, cluster_row)
@@ -153,16 +154,23 @@ pull_peaks <- function(clusters, data, peaks,
     handled_peaks <- c(handled_peaks, cluster$peaks)
   }
   
+  # Reorganise
+  cpeaks <- dplyr::arrange(cpeaks, Cluster_ID)
+  cdata <- cdata[c(sample_cols, cpeaks$Cluster_ID)]
+  
   # All the peaks that were not in the clusters are retained unchanged
   missed_peaks <- peaks[!peaks[, name_col] %in% handled_peaks, ]
-  missed_peaks$Cluster_ID <- missed_peaks[, name_col]
   missed_peaks$Peaks <- missed_peaks[, name_col]
+  missed_peaks$n_peaks <- 1
+  missed_peaks$Cluster_ID <- missed_peaks[, name_col]
+  
   
   cpeaks <- rbind(cpeaks, missed_peaks)
   cdata <- cbind(cdata, data[missed_peaks[, name_col]])
   
   # Reorder columns
-  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "Peaks", name_col, dplyr::everything())
+  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "n_peaks", "Peaks", name_col, dplyr::everything())
+  rownames(cpeaks) <- 1:nrow(cpeaks)
   
   list(cdata = cdata, cpeaks = cpeaks)
 }

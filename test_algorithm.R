@@ -83,13 +83,13 @@ test_that("Connections found correctly", {
 
 
 test_that("Clusters contain the correct peaks", {
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.01, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   
   clusters <- find_clusters(conn)
   
-  expect_equal(clusters[[1]]$peaks, c("F_1", "F_2", "F_3"))
-  expect_equal(clusters[[2]]$peaks, c("F_4", "F_5", "F_6"))
-  expect_equal(clusters[[3]]$peaks, c("F_7", "F_8"))
+  expect_equal(clusters[[1]]$peaks, c("F_4", "F_5", "F_6"))
+  expect_equal(clusters[[2]]$peaks, c("F_7", "F_8"))
+  expect_equal(clusters[[3]]$peaks, c("F_1", "F_2", "F_3"))
 })
 
 graph_equal <- function(g, h){
@@ -99,14 +99,14 @@ graph_equal <- function(g, h){
 
 test_that("Cluster subgraphs are formed correctly", {
   
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.01, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   
   # Expected graphs
   g <- graph_from_edgelist(as.matrix(conn[1:2]), directed = FALSE)
   g <- set_edge_attr(graph = g, name = "weight", value = conn[, "cor"])
-  g1 <- delete.vertices(g, paste0("F_", 4:8))
-  g2 <- delete.vertices(g, paste0("F_", c(1:3, 7:8)))
-  g3 <- delete.vertices(g, paste0("F_", 1:6))
+  g1 <- delete.vertices(g, paste0("F_", c(1:3, 7:8)))
+  g2 <- delete.vertices(g, paste0("F_", 1:6))
+  g3 <- delete.vertices(g, paste0("F_", 4:8))
   
   # The clusters returned
   clusters <- find_clusters(conn)
@@ -131,13 +131,14 @@ test_that("Peak pulling works", {
                       F_9 = X$F_9,
                       stringsAsFactors = FALSE)
   cpeaks <- data.frame(Cluster_ID = c("Cluster_F_3", "Cluster_F_5", "Cluster_F_8", "F_9"),
+                       n_peaks = c(3, 3, 2, 1),
                        Peaks = c("F_1;F_2;F_3", "F_4;F_5;F_6", "F_7;F_8", "F_9"),
                        P[P$Name %in% c("F_3", "F_5", "F_8", "F_9"), ],
                        MPA = sapply(X[c("F_3", "F_5", "F_8", "F_9")], median),
                        stringsAsFactors = FALSE)
-  
+  rownames(cpeaks) <- 1:nrow(cpeaks)
   # Returned
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.01, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   clusters <- find_clusters(conn)
   pulled <- pull_peaks(clusters, data= X, peaks = P, name_col = "Name")
   

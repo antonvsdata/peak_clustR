@@ -158,7 +158,7 @@ pull_peaks <- function(clusters, data, peaks,
   missed_peaks$Cluster_ID <- missed_peaks[, name_col]
   missed_peaks$Peaks <- missed_peaks[, name_col]
   
-  cpeaks <- rbind(missed_peaks, cpeaks)
+  cpeaks <- rbind(cpeaks, missed_peaks)
   cdata <- cbind(cdata, data[missed_peaks[, name_col]])
   
   # Reorder columns

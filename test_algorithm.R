@@ -121,4 +121,26 @@ test_that("Cluster subgraphs are formed correctly", {
 })
 
 
-
+test_that("Peak pulling works", {
+  
+  # Expected
+  cdata <- data.frame(Group = X$Group,
+                      Cluster_F_3 = X$F_3,
+                      Cluster_F_5 = X$F_5,
+                      Cluster_F_8 = X$F_8,
+                      F_9 = X$F_9,
+                      stringsAsFactors = FALSE)
+  cpeaks <- data.frame(Cluster_ID = c("Cluster_F_3", "Cluster_F_5", "Cluster_F_8", "F_9"),
+                       Peaks = c("F_1;F_2;F_3", "F_4;F_5;F_6", "F_7;F_8", "F_9"),
+                       P[P$Name %in% c("F_3", "F_5", "F_8", "F_9"), ],
+                       MPA = sapply(X[c("F_3", "F_5", "F_8", "F_9")], median),
+                       stringsAsFactors = FALSE)
+  
+  # Returned
+  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.01, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  clusters <- find_clusters(conn)
+  pulled <- pull_peaks(clusters, data= X, peaks = P, name_col = "Name")
+  
+  expect_identical(pulled$cdata, cdata)
+  expect_identical(pulled$cpeaks, cpeaks)
+})

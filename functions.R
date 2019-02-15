@@ -134,24 +134,26 @@ pull_peaks <- function(clusters, data, peaks,
   
   # Retain the strongest signal (MPA) from each cluster 
   for (cluster in clusters) {
-    peaks_tmp <- peaks[peaks[, name_col] %in% cluster$peaks, ]
-    
-    # Find the peak with maximal MPA
-    max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
-    cluster_row <- peaks_tmp[max_mpa_idx, ]
-    # Record all the peaks in the cluster
-    cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
-    cluster_row$n_peaks <- length(cluster$peaks)
-    # Create cluster ID
-    cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
-    cpeaks <- rbind(cpeaks, cluster_row)
-    
-    # Take the LC-MS data of the largest peak
-    cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
-    colnames(cdata_col) <- cluster_row$Cluster_ID
-    cdata <- cbind(cdata, cdata_col)
-    
-    handled_peaks <- c(handled_peaks, cluster$peaks)
+    if (length(cluster$peaks) > 1) {
+      peaks_tmp <- peaks[peaks[, name_col] %in% cluster$peaks, ]
+      
+      # Find the peak with maximal MPA
+      max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
+      cluster_row <- peaks_tmp[max_mpa_idx, ]
+      # Record all the peaks in the cluster
+      cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
+      cluster_row$n_peaks <- length(cluster$peaks)
+      # Create cluster ID
+      cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
+      cpeaks <- rbind(cpeaks, cluster_row)
+      
+      # Take the LC-MS data of the largest peak
+      cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
+      colnames(cdata_col) <- cluster_row$Cluster_ID
+      cdata <- cbind(cdata, cdata_col)
+      
+      handled_peaks <- c(handled_peaks, cluster$peaks)
+    }
   }
   
   # Reorganise

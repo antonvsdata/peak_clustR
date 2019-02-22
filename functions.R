@@ -1,41 +1,41 @@
 
-# Find out which peaks are correlated within a specified retention time window
+# Find out which features are correlated within a specified retention time window
 
 # Parameters:
 # data: data frame with the measurements and possibly some sample information
-#- size samples x (peaks + sample info columns)
-# peaks: data frame of peak information: at least name, retention time and mass-to-charge ratio
-#- size peaks x peak info columns
+#- size samples x (features + sample info columns)
+# features: data frame of feature information: at least name, retention time and mass-to-charge ratio
+#- size features x feature info columns
 # corr_thresh: the threshhold of correlation to use in linking signals
 # rt_window: the retention time window to use in linking signals
-# name_col: a string, name of the column in peaks that contains signal names
-# mz_col: a string, name of the column in peaks that contains mass-to-charge ratios
-# rt_col: a string, name of the column in peaks that contains retention times
+# name_col: a string, name of the column in features that contains signal names
+# mz_col: a string, name of the column in features that contains mass-to-charge ratios
+# rt_col: a string, name of the column in features that contains retention times
 #
 # Returns:
 # a data frame of pairs of signals that are linked together
 #   - x & y: indexes and names of the signals
 #   - cor: correlation coefficient
 #   - mz_diff & rt_diff: mass and retention time difference
-find_connections <- function(data, peaks, corr_thresh = 0.9, rt_window = 1/60,
+find_connections <- function(data, features, corr_thresh = 0.9, rt_window = 1/60,
                          name_col, mz_col, rt_col) {
   
-  D <- data[peaks[,name_col]]
+  D <- data[features[,name_col]]
   if (ncol(D) < 2) {
     stop("Need at least 2 signals to do any clustering!")
   }
   C <- cor(D)
-  n <- nrow(peaks)
+  n <- nrow(features)
   connections <- data.frame()
   for(i in 1:(n-1)){
     if (i %% 100 == 0){
       print(i)
     }
     for (j in (i+1):n){
-      rt_diff <- peaks[j, rt_col] - peaks[i, rt_col]
+      rt_diff <- features[j, rt_col] - features[i, rt_col]
       if (abs(rt_diff) < rt_window & C[i,j] > corr_thresh){
-        mz_diff <- peaks[j, mz_col] - peaks[i, mz_col]
-        connections = rbind(connections, data.frame(x = peaks[i, name_col], y = peaks[j, name_col],
+        mz_diff <- features[j, mz_col] - features[i, mz_col]
+        connections = rbind(connections, data.frame(x = features[i, name_col], y = features[j, name_col],
                                                     cor = C[i,j], rt_diff = rt_diff, mz_diff = mz_diff))
       }
     }
@@ -55,9 +55,9 @@ find_connections <- function(data, peaks, corr_thresh = 0.9, rt_window = 1/60,
 #
 # Returns:
 # a list of clusters, each a list of:
-#   - peaks: character vector of the names of the peaks included in the cluster
+#   - features: character vector of the names of the features included in the cluster
 #   - graph: an igraph object of the cluster
-find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
+find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
   if(!requireNamespace("igraph", quietly = TRUE)){
     stop("The igraph package is required for this function")
   }
@@ -97,7 +97,7 @@ find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
       }
       
       # Record the final cluster and remove the nodes from the main graph
-      clusters[[k]] <- list(peaks = names(igraph::V(subg)),
+      clusters[[k]] <- list(features = names(igraph::V(subg)),
                             graph = subg)
       k <- k + 1
       g <- igraph::delete.vertices(g, v = names(igraph::V(subg)))
@@ -107,74 +107,74 @@ find_clusters <- function(connections, peaks, name_col, d_thresh = 0.8){
   clusters
 }
 
-# Extract information of the peaks of all clusters
-# The LC-MS data of the peak with largest median peak area is retained,
-# all the peaks in every cluster are recorded
+# Extract information of the features of all clusters
+# The LC-MS data of the feature with largest median peak area is retained,
+# all the features in every cluster are recorded
 #
 # Parameters:
 # - clusters: list of cluster information, as returned by find_clusters
 # - data: data frame of the original LC-MS data
-# - peaks: data frame holding the peak information
-# - name_col: a string, name of the column in peaks that contains signal names
+# - features: data frame holding the feature information
+# - name_col: a string, name of the column in features that contains signal names
 #
 # Returns:
 # List of two items:
 #   - cdata: a new data frame with the combined LC-MS data
-#   - cpeaks: data frame, peak information per cluster
-pull_peaks <- function(clusters, data, peaks,
+#   - cfeatures: data frame, feature information per cluster
+pull_features <- function(clusters, data, features,
                        name_col){
   
   # Median peak area
-  peaks$MPA <- sapply(data[peaks[, name_col]], median, na.rm = TRUE)
+  features$MPA <- sapply(data[features[, name_col]], median, na.rm = TRUE)
   
-  cpeaks <- data.frame()
-  sample_cols <- setdiff(colnames(data), peaks[, name_col])
+  cfeatures <- data.frame()
+  sample_cols <- setdiff(colnames(data), features[, name_col])
   cdata <- data[sample_cols]
-  handled_peaks <- c()
+  handled_features <- c()
   
   # Retain the strongest signal (MPA) from each cluster 
   for (cluster in clusters) {
-    if (length(cluster$peaks) > 1) {
-      peaks_tmp <- peaks[peaks[, name_col] %in% cluster$peaks, ]
+    if (length(cluster$features) > 1) {
+      features_tmp <- features[features[, name_col] %in% cluster$features, ]
       
-      # Find the peak with maximal MPA
-      max_mpa_idx <- which(peaks_tmp$MPA == max(peaks_tmp$MPA, na.rm = TRUE))[1]
-      cluster_row <- peaks_tmp[max_mpa_idx, ]
-      # Record all the peaks in the cluster
-      cluster_row$Peaks <- paste(sort(cluster$peaks), collapse = ";")
-      cluster_row$n_peaks <- length(cluster$peaks)
+      # Find the feature with maximal MPA
+      max_mpa_idx <- which(features_tmp$MPA == max(features_tmp$MPA, na.rm = TRUE))[1]
+      cluster_row <- features_tmp[max_mpa_idx, ]
+      # Record all the features in the cluster
+      cluster_row$Features <- paste(sort(cluster$features), collapse = ";")
+      cluster_row$n_features <- length(cluster$features)
       # Create cluster ID
       cluster_row$Cluster_ID <- paste0("Cluster_", cluster_row[, name_col])
-      cpeaks <- rbind(cpeaks, cluster_row)
+      cfeatures <- rbind(cfeatures, cluster_row)
       
-      # Take the LC-MS data of the largest peak
-      cdata_col <- data[peaks_tmp[max_mpa_idx, name_col]]
+      # Take the LC-MS data of the largest feature
+      cdata_col <- data[features_tmp[max_mpa_idx, name_col]]
       colnames(cdata_col) <- cluster_row$Cluster_ID
       cdata <- cbind(cdata, cdata_col)
       
-      handled_peaks <- c(handled_peaks, cluster$peaks)
+      handled_features <- c(handled_features, cluster$features)
     }
   }
   
   # Reorganise
-  cpeaks <- dplyr::arrange(cpeaks, Cluster_ID)
-  cdata <- cdata[c(sample_cols, cpeaks$Cluster_ID)]
+  cfeatures <- dplyr::arrange(cfeatures, Cluster_ID)
+  cdata <- cdata[c(sample_cols, cfeatures$Cluster_ID)]
   
-  # All the peaks that were not in the clusters are retained unchanged
-  missed_peaks <- peaks[!peaks[, name_col] %in% handled_peaks, ]
-  missed_peaks$Peaks <- missed_peaks[, name_col]
-  missed_peaks$n_peaks <- 1
-  missed_peaks$Cluster_ID <- missed_peaks[, name_col]
+  # All the features that were not in the clusters are retained unchanged
+  missed_features <- features[!features[, name_col] %in% handled_features, ]
+  missed_features$Features <- missed_features[, name_col]
+  missed_features$n_features <- 1
+  missed_features$Cluster_ID <- missed_features[, name_col]
   
   
-  cpeaks <- rbind(cpeaks, missed_peaks)
-  cdata <- cbind(cdata, data[missed_peaks[, name_col]])
+  cfeatures <- rbind(cfeatures, missed_features)
+  cdata <- cbind(cdata, data[missed_features[, name_col]])
   
   # Reorder columns
-  cpeaks <- dplyr::select(cpeaks, "Cluster_ID", "n_peaks", "Peaks", name_col, dplyr::everything())
-  rownames(cpeaks) <- 1:nrow(cpeaks)
+  cfeatures <- dplyr::select(cfeatures, "Cluster_ID", "n_features", "Features", name_col, dplyr::everything())
+  rownames(cfeatures) <- 1:nrow(cfeatures)
   
-  list(cdata = cdata, cpeaks = cpeaks)
+  list(cdata = cdata, cfeatures = cfeatures)
 }
 
 
@@ -184,7 +184,7 @@ pull_peaks <- function(clusters, data, peaks,
 # dfs:        a list of dataframes, one per sheet
 # filename:   character, the name of the file
 # sheetnames: charcater vector, names of the sheets
-multisheet_xlsx <- function(dfs, filename, sheetnames = c("Data", "Peaks")){
+multisheet_xlsx <- function(dfs, filename, sheetnames = c("Data", "Features")){
   
   if (length(dfs) != length(sheetnames)) {
     stop("The number of dataframes and the number of sheet names does not match!")

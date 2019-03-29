@@ -24,22 +24,22 @@ find_connections <- function(data, features, corr_thresh = 0.9, rt_window = 1/60
   if (ncol(D) < 2) {
     stop("Need at least 2 signals to do any clustering!")
   }
-  C <- cor(D)
   n <- nrow(features)
-  connections <- data.frame()
-  for(i in 1:(n-1)){
+  connections <- foreach::foreach(i = seq_len(n-1), .combine = rbind) %dopar% {
     if (i %% 100 == 0){
       print(i)
     }
+    connections_tmp <- data.frame()
     for (j in (i+1):n){
       rt_diff <- features[j, rt_col] - features[i, rt_col]
-      if (abs(rt_diff) < rt_window & C[i,j] > corr_thresh){
+      cor_coef <- cor(D[, i], D[, j])
+      if (abs(rt_diff) < rt_window & cor_coef > corr_thresh){
         mz_diff <- features[j, mz_col] - features[i, mz_col]
-        connections = rbind(connections, data.frame(x = features[i, name_col], y = features[j, name_col],
-                                                    cor = C[i,j], rt_diff = rt_diff, mz_diff = mz_diff))
+        connections_tmp <- rbind(connections_tmp, data.frame(x = features[i, name_col], y = features[j, name_col],
+                                                    cor = cor_coef, rt_diff = rt_diff, mz_diff = mz_diff))
       }
     }
-    
+    connections_tmp
   }
   connections
 }

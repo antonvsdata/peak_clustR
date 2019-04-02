@@ -13,7 +13,7 @@ plot_graph <- function(features, cluster, name_col, mz_col, rt_col) {
   g <- cluster$graph
   vertices <- data.frame(Name = igraph::V(g)$name, stringsAsFactors = FALSE)
   colnames(vertices) <- name_col
-  features_tmp <- dplyr::left_join(vertices, features, by = "Name")
+  features_tmp <- dplyr::left_join(vertices, features, by = name_col)
   
   # Scaling of MPA to correct size
   # Square root to scale area, not radius

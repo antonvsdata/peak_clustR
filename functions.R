@@ -74,9 +74,16 @@ find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
   while(length(igraph::V(g))){
     # Connected components of the remaining graph
     comp <- igraph::decompose(g)
+    n_comp <- length(comp)
+    cat(paste(n_comp, "components_found\n\n"))
     
     # Only keep the densely connected part of each component (subgraph)
-    for(subg in comp){
+    for(i in seq_len(n_comp)) {
+      
+      if (i %% 100 == 0) {
+        cat(paste("Component", i, "/", n_comp,"\n"))
+      }
+      subg <- comp[[i]]
       
       n_nodes <- length(igraph::V(subg))
       d <- igraph::degree(subg)
@@ -88,7 +95,11 @@ find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
         # Remove the node with the smallest degree until all nodes in the cluster have
         # a degree above the limit
         while(any(d < d_lim)){
-          idx <- which(d == min(d))[1]
+          idx <- which(d == min(d))
+          if (length(idx) > 1) {
+            edgesums <- sapply(igraph::V(subg)$name[idx], function(x) sum(igraph::E(subg)[from(igraph::V(subg)[x])]$weight))
+            idx <- idx[which(edgesums == min(edgesums))[1]]
+          }
           subg <- igraph::delete.vertices(subg, v = igraph::V(subg)[idx])
           d <- igraph::degree(subg)
           n_nodes <- n_nodes - 1
@@ -132,8 +143,14 @@ pull_features <- function(clusters, data, features,
   cdata <- data[sample_cols]
   handled_features <- c()
   
+  n_clusters <- length(clusters)
   # Retain the strongest signal (MPA) from each cluster 
-  for (cluster in clusters) {
+  for (i in seq_along(clusters)) {
+    if (i %% 100 == 0) {
+      cat(paste("Cluster", i, "/", n_clusters, "\n"))
+    }
+    
+    cluster <- clusters[[i]]
     if (length(cluster$features) > 1) {
       features_tmp <- features[features[, name_col] %in% cluster$features, ]
       

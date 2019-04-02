@@ -1,5 +1,6 @@
 library(testthat)
 library(igraph)
+library(doParallel)
 
 # Load functions
 source("//research/antom/Projects/PeakCluster/peak_clustR/functions.R")
@@ -83,13 +84,13 @@ test_that("Connections found correctly", {
 
 
 test_that("Clusters contain the correct peaks", {
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, features = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   
   clusters <- find_clusters(conn)
   
-  expect_equal(clusters[[1]]$peaks, c("F_4", "F_5", "F_6"))
-  expect_equal(clusters[[2]]$peaks, c("F_7", "F_8"))
-  expect_equal(clusters[[3]]$peaks, c("F_1", "F_2", "F_3"))
+  expect_equal(clusters[[1]]$features, c("F_4", "F_5", "F_6"))
+  expect_equal(clusters[[2]]$features, c("F_7", "F_8"))
+  expect_equal(clusters[[3]]$features, c("F_1", "F_2", "F_3"))
 })
 
 graph_equal <- function(g, h){
@@ -99,7 +100,7 @@ graph_equal <- function(g, h){
 
 test_that("Cluster subgraphs are formed correctly", {
   
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, features = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   
   # Expected graphs
   g <- graph_from_edgelist(as.matrix(conn[1:2]), directed = FALSE)
@@ -121,7 +122,7 @@ test_that("Cluster subgraphs are formed correctly", {
 })
 
 
-test_that("Peak pulling works", {
+test_that("feature pulling works", {
   
   # Expected
   cdata <- data.frame(Group = X$Group,
@@ -130,18 +131,18 @@ test_that("Peak pulling works", {
                       Cluster_F_8 = X$F_8,
                       F_9 = X$F_9,
                       stringsAsFactors = FALSE)
-  cpeaks <- data.frame(Cluster_ID = c("Cluster_F_3", "Cluster_F_5", "Cluster_F_8", "F_9"),
-                       n_peaks = c(3, 3, 2, 1),
-                       Peaks = c("F_1;F_2;F_3", "F_4;F_5;F_6", "F_7;F_8", "F_9"),
+  cfeatures <- data.frame(Cluster_ID = c("Cluster_F_3", "Cluster_F_5", "Cluster_F_8", "F_9"),
+                       n_features = c(3, 3, 2, 1),
+                       Features = c("F_1;F_2;F_3", "F_4;F_5;F_6", "F_7;F_8", "F_9"),
                        P[P$Name %in% c("F_3", "F_5", "F_8", "F_9"), ],
                        MPA = sapply(X[c("F_3", "F_5", "F_8", "F_9")], median),
                        stringsAsFactors = FALSE)
-  rownames(cpeaks) <- 1:nrow(cpeaks)
+  rownames(cfeatures) <- 1:nrow(cfeatures)
   # Returned
-  conn <- find_connections(data = X, peaks = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
+  conn <- find_connections(data = X, features = P, corr_thresh = 0.85, rt_window = 0.03, name_col = "Name", mz_col = "mz", rt_col = "rt")
   clusters <- find_clusters(conn)
-  pulled <- pull_peaks(clusters, data= X, peaks = P, name_col = "Name")
+  pulled <- pull_features(clusters, data= X, features = P, name_col = "Name")
   
   expect_identical(pulled$cdata, cdata)
-  expect_identical(pulled$cpeaks, cpeaks)
+  expect_identical(pulled$cfeatures, cfeatures)
 })

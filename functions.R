@@ -32,11 +32,13 @@ find_connections <- function(data, features, corr_thresh = 0.9, rt_window = 1/60
     connections_tmp <- data.frame()
     for (j in (i+1):n){
       rt_diff <- features[j, rt_col] - features[i, rt_col]
-      cor_coef <- cor(D[, i], D[, j])
-      if (abs(rt_diff) < rt_window & cor_coef > corr_thresh){
-        mz_diff <- features[j, mz_col] - features[i, mz_col]
-        connections_tmp <- rbind(connections_tmp, data.frame(x = features[i, name_col], y = features[j, name_col],
-                                                    cor = cor_coef, rt_diff = rt_diff, mz_diff = mz_diff))
+      cor_coef <- cor(D[, i], D[, j], use = "na.or.complete")
+      if (!is.na(cor_coef)) {
+        if (abs(rt_diff) < rt_window & cor_coef > corr_thresh){
+          mz_diff <- features[j, mz_col] - features[i, mz_col]
+          connections_tmp <- rbind(connections_tmp, data.frame(x = features[i, name_col], y = features[j, name_col],
+                                                               cor = cor_coef, rt_diff = rt_diff, mz_diff = mz_diff))
+        }
       }
     }
     connections_tmp
@@ -57,7 +59,7 @@ find_connections <- function(data, features, corr_thresh = 0.9, rt_window = 1/60
 # a list of clusters, each a list of:
 #   - features: character vector of the names of the features included in the cluster
 #   - graph: an igraph object of the cluster
-find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
+find_clusters <- function(connections, d_thresh = 0.8){
   if(!requireNamespace("igraph", quietly = TRUE)){
     stop("The igraph package is required for this function")
   }
@@ -75,7 +77,7 @@ find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
     # Connected components of the remaining graph
     comp <- igraph::decompose(g)
     n_comp <- length(comp)
-    cat(paste(n_comp, "components_found\n\n"))
+    cat(paste(n_comp, "components found\n\n"))
     
     # Only keep the densely connected part of each component (subgraph)
     for(i in seq_len(n_comp)) {
@@ -97,7 +99,7 @@ find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
         while(any(d < d_lim)){
           idx <- which(d == min(d))
           if (length(idx) > 1) {
-            edgesums <- sapply(igraph::V(subg)$name[idx], function(x) sum(igraph::E(subg)[from(igraph::V(subg)[x])]$weight))
+            edgesums <- igraph::strength(subg, vids = igraph::V(subg)$name[idx])
             idx <- idx[which(edgesums == min(edgesums))[1]]
           }
           subg <- igraph::delete.vertices(subg, v = igraph::V(subg)[idx])
@@ -115,6 +117,74 @@ find_clusters <- function(connections, features, name_col, d_thresh = 0.8){
     }
     
   }
+  clusters
+}
+
+find_clusters_parallel <- function(connections, d_thresh = 0.8){
+  if(!requireNamespace("igraph", quietly = TRUE)){
+    stop("The igraph package is required for this function")
+  }
+  
+  # Construct graph from the given edges
+  g <- igraph::graph_from_edgelist(as.matrix(connections[1:2]), directed = FALSE)
+  g <- igraph::set.edge.attribute(graph = g, name = "weight", value = connections$cor)
+  
+  # Initialize list of clusters
+  clusters <- list()
+  k <- 1
+  
+  # Repeatedly extract densely connected clusters from the graph
+  while(length(igraph::V(g))){
+    # Connected components of the remaining graph
+    comp <- igraph::decompose(g)
+    n_comp <- length(comp)
+    cat(paste(n_comp, "components found\n\n"))
+    
+    # Only keep the densely connected part of each component (subgraph)
+    clusters_tmp <- foreach(i = seq_len(n_comp), .combine = c) %dopar% {
+      
+      if (i %% 100 == 0) {
+        cat(paste("Component", i, "/", n_comp,"\n"))
+      }
+      subg <- comp[[i]]
+      
+      n_nodes <- length(igraph::V(subg))
+      d <- igraph::degree(subg)
+      # The limit of the degree a node needs to be kept
+      d_lim <- round(d_thresh * (n_nodes-1))
+      
+      # 
+      if(n_nodes >= 3) {
+        # Remove the node with the smallest degree until all nodes in the cluster have
+        # a degree above the limit
+        while(any(d < d_lim)){
+          idx <- which(d == min(d))
+          if (length(idx) > 1) {
+            edgesums <- igraph::strength(subg, vids = igraph::V(subg)$name[idx])
+            idx <- idx[which(edgesums == min(edgesums))[1]]
+          }
+          subg <- igraph::delete.vertices(subg, v = igraph::V(subg)[idx])
+          d <- igraph::degree(subg)
+          n_nodes <- n_nodes - 1
+          d_lim <- round(d_thresh * (n_nodes-1))
+        }
+      }
+      
+      # Record the final cluster and remove the nodes from the main graph
+      list(list(features = names(igraph::V(subg)),
+                            graph = subg))
+      
+    }
+    
+    for (j in seq_along(clusters_tmp)) {
+      clusters[[k]] <- clusters_tmp[[j]]
+      k <- k + 1
+      subg <- clusters_tmp[[j]]$graph
+      g <- igraph::delete.vertices(g, v = names(igraph::V(subg)))
+    }
+    
+  }
+  
   clusters
 }
 

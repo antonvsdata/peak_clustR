@@ -9,3 +9,7 @@ David Broadhurst
 Anton Mattsson
 
 This R implementation is written by Anton Mattsson, antom at uef dot fi
+
+Link to binder:  
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/antonvsdata/peak_clustR/master)

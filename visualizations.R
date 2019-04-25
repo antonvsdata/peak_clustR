@@ -19,10 +19,15 @@ plot_graph <- function(features, cluster, name_col, mz_col, rt_col) {
   # Square root to scale area, not radius
   size <- sqrt(rescale(features_tmp$MPA, new_min = 15^2, new_max = 40^2))
   
-  edge_labels <- as.character(round(igraph::E(g)$weight, digits = 2))
+  if (length(igraph::E(g)) <= 20) {
+    edge_labels <- as.character(round(igraph::E(g)$weight, digits = 2))
+  } else {
+    edge_labels <- NULL
+  }
+  
   
   g$palette <- RColorBrewer::brewer.pal(n = max(3, length(unique(igraph::degree(g)))), name = "Blues")
-  plot(g, vertex.label = as.character(features_tmp[, mz_col]), vertex.size = size, vertex.label.dist = 0.105*size, vertex.label.degree = -pi/2,
+  plot(g, vertex.label = as.character(features_tmp[, mz_col]), vertex.size = size, vertex.label.dist = 0.1*size, vertex.label.degree = -pi/2,
        vertex.color = igraph::degree(g), edge.label = edge_labels)
 }
 
@@ -78,10 +83,13 @@ plot_heatmaps <- function(data, features, cluster, name_col, mz_col, rt_col) {
   
   p1 <- ggplot(mz_rt, aes(x = x, y = y, fill = mz_diff)) +
     geom_tile(color = "grey80") +
-    geom_text(aes(label = round(mz_diff, digits = 2))) +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 90, vjust = 1)) +
     scale_fill_gradient2()
+  
+  if (nrow(mz_rt) <= 10) {
+    p <- p + geom_text(aes(label = round(mz_diff, digits = 2)))
+  }
   
   # rt_ord <- features_tmp[, name_col][order(features_tmp[, rt_col])]
   # mz_rt$x <- factor(mz_rt$x, levels = rt_ord)
@@ -97,14 +105,18 @@ plot_heatmaps <- function(data, features, cluster, name_col, mz_col, rt_col) {
   plot(p1)
 }
 
-visualize_clusters <- function(data, features, clusters, rt_window, name_col, mz_col, rt_col, file_path) {
+visualize_clusters <- function(data, features, clusters, min_size, rt_window, name_col, mz_col, rt_col, file_path) {
   
-  for (cluster in clusters) {
-    if (length(cluster$features) >= 2) {
+  for (i in seq_along(clusters)) {
+    if (i %% 100 == 0) {
+      print(paste(i, "/", length(clusters)))
+    }
+    cluster <- clusters[[i]]
+    if (length(cluster$features) >= min_size) {
       features_tmp <- features[features[, name_col] %in% cluster$features, ]
       cluster_id <- features_tmp[, name_col][which(features_tmp$MPA == max(features_tmp$MPA, na.rm = TRUE))[1]]
       
-      pdf(paste0(file_path, cluster_id, ".pdf"))
+      pdf(paste0(file_path, "Cluster_", i, "_", cluster_id, ".pdf"), width = 10, height = 10)
       plot_heatmaps(data, features, cluster, name_col, mz_col, rt_col)
       plot_features(features, cluster, name_col, mz_col, rt_col, rt_window)
       plot_graph(features, cluster, name_col, mz_col, rt_col)

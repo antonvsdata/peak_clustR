@@ -3,7 +3,7 @@ library(igraph)
 library(doParallel)
 
 # Load functions
-source("//research/antom/Projects/PeakCluster/peak_clustR/functions.R")
+source("functions.R")
 
 # Create toy data
 n <- 100
